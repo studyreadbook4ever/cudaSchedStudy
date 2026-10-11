@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Unlicense
+set -euo pipefail
+project_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$project_dir"
+skip_sanitizers=false
+if [ "${1:-}" = --skip-sanitizers ]; then
+  skip_sanitizers=true
+  shift
+fi
+if [ "$#" -ne 0 ]; then
+  printf '%s\n' 'Usage: scripts/verify [--skip-sanitizers]' >&2
+  exit 2
+fi
+scripts/source-audit
+python3 -m unittest discover -s tests -p test_release.py -v
+python3 -m unittest discover -s tests -p test_client_protocol.py -v
+python3 -m unittest discover -s tests -p test_container_lifecycle.py -v
+bash scripts/build.sh
+mkdir -p artifacts/verify
+build/gpu_probe | tee artifacts/verify/probe.log
+build/backend_smoke | tee artifacts/verify/backend.log
+if [ -x build/backend_stress ]; then
+  build/backend_stress | tee artifacts/verify/backend-stress.log
+fi
+for backend_mode in green streams; do
+  GPU_HOST_BINARY="$project_dir/build/gpu-host" GPU_TEST_MODE="$backend_mode" \
+    GPU_TEST_ARTIFACT_DIR="$project_dir/artifacts/verify/integration-$backend_mode" \
+    python3 -m unittest discover -s tests -p test_integration.py -v \
+    2>&1 | tee "artifacts/verify/integration-$backend_mode.log"
+  python3 tools/demo.py --mode "$backend_mode" --output "artifacts/verify/demo-$backend_mode.json"
+done
+if ! "$skip_sanitizers"; then
+  sanitizer="$(command -v compute-sanitizer || true)"
+  if [ -z "$sanitizer" ]; then
+    for candidate in /usr/local/cuda/bin/compute-sanitizer /opt/cuda/bin/compute-sanitizer; do
+      if [ -x "$candidate" ]; then sanitizer="$candidate"; break; fi
+    done
+  fi
+  if [ -z "$sanitizer" ]; then
+    printf '%s\n' 'Compute Sanitizer missing. Install it or explicitly use --skip-sanitizers.' >&2
+    exit 1
+  fi
+  "$sanitizer" --tool memcheck --leak-check full --error-exitcode 99 build/backend_smoke \
+    2>&1 | tee artifacts/verify/memcheck.log
+  for sanitizer_tool in initcheck racecheck synccheck; do
+    "$sanitizer" --tool "$sanitizer_tool" --error-exitcode 99 build/backend_smoke \
+      2>&1 | tee "artifacts/verify/$sanitizer_tool.log"
+  done
+  if [ -x build/backend_stress ]; then
+    for sanitizer_tool in memcheck initcheck; do
+      "$sanitizer" --tool "$sanitizer_tool" --error-exitcode 99 build/backend_stress \
+        2>&1 | tee "artifacts/verify/backend-stress-$sanitizer_tool.log"
+    done
+  fi
+fi
+printf '%s\n' 'Verification passed. Evidence: artifacts/verify/'

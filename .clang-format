@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: Unlicense
+BasedOnStyle: LLVM
+IndentWidth: 2
+ColumnLimit: 100
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false

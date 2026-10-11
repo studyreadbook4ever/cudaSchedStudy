@@ -1,0 +1,5 @@
+#!/bin/sh
+# SPDX-License-Identifier: Unlicense
+set -eu
+CONTAINER_PROJECT_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+exec python3 "$CONTAINER_PROJECT_ROOT/containers/negative.py" "$@"
