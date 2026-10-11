@@ -32,6 +32,24 @@ class SourceRelease(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "Missing Unlicense SPDX"):
                     release.audit()
 
+    def test_readme_marker_can_follow_preserved_author_introduction(self):
+        with tempfile.TemporaryDirectory(prefix="gpu-source-readme-section-") as directory:
+            temp = Path(directory)
+            for name in release.TOP:
+                content = (ROOT / "LICENSE").read_bytes() if name == "LICENSE" else b"# SPDX-License-Identifier: Unlicense\n"
+                (temp / name).write_bytes(content)
+            introduction = b"# Theory\r\n" + b"Author-owned introduction.\r\n" * 40
+            readme = introduction + b"# Architecture\r\n<!-- SPDX-License-Identifier: Unlicense -->\r\n"
+            (temp / "README.md").write_bytes(readme)
+            with mock.patch.object(release, "ROOT", temp):
+                snapshot, manifest = release.audit()
+                self.assertEqual(manifest["README.md"], hashlib.sha256(readme).hexdigest())
+                archived_readme = next(data for name, data, _ in snapshot if name == "README.md")
+                self.assertEqual(archived_readme[:len(introduction)], introduction)
+                (temp / "CONTRIBUTING.md").write_bytes(b"Introduction\n" * 60 + b"# SPDX-License-Identifier: Unlicense\n")
+                with self.assertRaisesRegex(ValueError, "Missing Unlicense SPDX marker: CONTRIBUTING.md"):
+                    release.audit()
+
     def test_public_archive_is_complete_and_reusable(self):
         snapshot, manifest = release.audit()
         with tempfile.TemporaryDirectory(prefix="gpu-source-test-") as directory:
@@ -44,7 +62,8 @@ class SourceRelease(unittest.TestCase):
             with tarfile.open(first) as archive:
                 names = {member.name for member in archive.getmembers()}
                 for required in ("LICENSE", "CMakeLists.txt", "scripts/build.sh", "scripts/verify",
-                                 "src/server.cpp", "src/gpu_backend.cu", "python/gpuctl.py"):
+                                 "src/server.cpp", "src/gpu_backend.cu", "python/gpuctl.py",
+                                 "docs/images/architecture.svg"):
                     self.assertIn("gpu-host-lab/" + required, names)
                 self.assertFalse(any(part in {"runtime", "build", "artifacts", ".tools"}
                                      for name in names for part in Path(name).parts))

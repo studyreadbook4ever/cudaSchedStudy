@@ -84,7 +84,7 @@ scripts/source-audit
 scripts/export-source
 ```
 
-exporter는 검사를 통과한 텍스트 소스만 `dist/gpu-host-lab-source.tar.gz`에 담습니다. LICENSE, 기여 규칙, 의존성 출처와 파일별 SHA256 manifest가 포함되며, 실행 파일·Docker image·token·개인 실행 로그는 빠집니다. **공개할 때는 이 소스 묶음 또는 `.gitignore`를 적용한 소스 파일을 사용합니다.** GitHub에는 소스만 게시하며 GitHub Actions workflow는 포함하지 않습니다. 루트 README.md는 의도적으로 비워 두고 사용법은 이 문서에 보관합니다.
+exporter는 검사를 통과한 텍스트 소스만 `dist/gpu-host-lab-source.tar.gz`에 담습니다. LICENSE, 기여 규칙, 의존성 출처와 파일별 SHA256 manifest, 직접 작성한 SVG 구조도가 포함되며, 실행 파일·Docker image·token·개인 실행 로그는 빠집니다. **공개할 때는 이 소스 묶음 또는 `.gitignore`를 적용한 소스 파일을 사용합니다.** GitHub에는 소스만 게시하며 GitHub Actions workflow는 포함하지 않습니다. 루트 README.md에는 작성자의 이론 메모와 아키텍처 설명을 두고, 상세 실행 명령은 이 문서에 보관합니다.
 
 Unlicense는 직접 작성한 코드에 적용됩니다. 향후 외부 코드를 추가하거나 CUDA와 연결된 실행 파일/container image를 배포할 때는 해당 의존성의 재배포 조건을 별도로 확인해야 합니다.
 

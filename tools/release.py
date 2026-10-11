@@ -19,7 +19,7 @@ DIRECTORIES = {"src", "include", "python", "tests", "tools", "scripts", "contain
 EXCLUDED = {".git", ".tools", "runtime", "artifacts", "dist", "__pycache__",
             "SOURCE_MANIFEST.json"}  # Generated anew on each export, including re-export.
 SUFFIXES = {".cpp", ".cu", ".hpp", ".h", ".py", ".sh", ".md"}
-SPECIAL = {"containers/Dockerfile"}
+SPECIAL = {"containers/Dockerfile", "docs/images/architecture.svg"}
 SECRET_PATTERNS = [re.compile(rb"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
                    re.compile(rb"gh[pousr]_[A-Za-z0-9]{30,}"),
                    re.compile(rb"github_pat_[A-Za-z0-9_]{30,}")]
@@ -72,10 +72,12 @@ def audit():
         if len(data) > 2 * 1024 * 1024 or b"\0" in data:
             raise ValueError(f"Binary or oversized source file: {name}")
         text = data.decode("utf-8")
-        # The project's root README is intentionally empty. Only a zero-byte
-        # README gets this exception; every other authored source needs SPDX.
+        # Preserve an author's introductory README section: its SPDX marker can
+        # live with the project documentation later in that file. An empty
+        # README remains valid; other authored source needs a header marker.
         empty_readme = name == "README.md" and data == b""
-        if name != "LICENSE" and not empty_readme and "SPDX-License-Identifier: Unlicense" not in text[:512]:
+        marker_region = text if name == "README.md" else text[:512]
+        if name != "LICENSE" and not empty_readme and "SPDX-License-Identifier: Unlicense" not in marker_region:
             raise ValueError(f"Missing Unlicense SPDX marker: {name}")
         if any(pattern.search(data) for pattern in SECRET_PATTERNS):
             raise ValueError(f"Credential/private key pattern in source: {name}")

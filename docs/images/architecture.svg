@@ -1,0 +1,132 @@
+<!-- SPDX-License-Identifier: Unlicense -->
+<svg xmlns="http://www.w3.org/2000/svg" width="1560" height="1510" viewBox="0 0 1560 1510" role="img" aria-labelledby="title description">
+  <title id="title">cudaSchedStudy 요청, 스케줄링, GPU 실행과 결과 회신 구조</title>
+  <desc id="description">Python CLI와 GPU 장치 없는 Docker 클라이언트는 Unix socket으로 CPU broker에 접속한다. Broker는 인증, quota, tenant 단위 FIFO lane admission, weighted credit과 quantum 기반 batch 편성을 담당한다. CPU 측 CUDA backend가 pinned descriptor를 GPU에 제출하고 event를 확인한다. GPU에서는 lane별 Green Context와 stream으로 같은 tenant의 job slice batch를 실행한다. 최종 summary와 완료 상태는 backend, broker, socket을 거쳐 클라이언트에 돌아간다. 기본 네 lane 중 두 개를 그렸으며, GPU arena는 총 64 MiB이고 pinned metadata는 총 7 KiB다. Green Context는 MIG나 VRAM 보안 격리를 제공하는 구조가 아니다.</desc>
+  <defs>
+    <marker id="request-arrow" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L8,4 L0,8 Z" fill="#2563eb"/></marker>
+    <marker id="result-arrow" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L8,4 L0,8 Z" fill="#15803d"/></marker>
+    <style>
+      text { font-family: 'Noto Sans CJK KR', 'Noto Sans KR', sans-serif; fill: #172033; font-size: 22px; }
+      .title { font-size: 34px; font-weight: 700; }
+      .heading { font-size: 26px; font-weight: 700; }
+      .label { font-size: 24px; font-weight: 700; }
+      .small { font-size: 20px; }
+      .muted { fill: #526079; }
+      .request { fill: none; stroke: #2563eb; stroke-width: 3; marker-end: url(#request-arrow); }
+      .result { fill: none; stroke: #15803d; stroke-width: 3; marker-end: url(#result-arrow); }
+      .frame { fill: #ffffff; stroke: #c4ccda; stroke-width: 2; }
+      .step { fill: #ffffff; stroke: #c4ccda; stroke-width: 1.5; }
+    </style>
+  </defs>
+
+  <rect width="1560" height="1510" fill="#f8fafc"/>
+  <text x="50" y="57" class="title">cudaSchedStudy · 요청이 GPU 작업이 되고, 결과로 돌아오는 길</text>
+  <path class="request" d="M1070 91 H1115"/>
+  <text x="1128" y="98" class="small">요청 / 제출</text>
+  <path class="result" d="M1320 91 H1365"/>
+  <text x="1378" y="98" class="small">완료 / 회신</text>
+
+  <rect x="50" y="125" width="680" height="155" rx="14" class="frame"/>
+  <text x="80" y="170" class="heading">Python CLI / Python API</text>
+  <text x="80" y="213">HELLO · SUBMIT · GET · CANCEL · LEAVE</text>
+  <text x="80" y="249" class="muted">tenant token으로 인증하고, 작업 상태를 요청한다.</text>
+
+  <rect x="830" y="125" width="680" height="155" rx="14" class="frame"/>
+  <text x="860" y="170" class="heading">Docker 클라이언트</text>
+  <text x="860" y="213">GPU device 없이 같은 API를 사용한다.</text>
+  <text x="860" y="249" class="muted">socket + 자기 token만 mount · hold / heartbeat</text>
+
+  <path class="request" d="M410 280 V325"/>
+  <path class="result" d="M620 325 V280"/>
+  <path class="request" d="M1000 280 V325"/>
+  <path class="result" d="M1210 325 V280"/>
+  <rect x="290" y="325" width="980" height="70" rx="12" fill="#eff6ff" stroke="#93b4ef" stroke-width="2"/>
+  <text x="780" y="370" text-anchor="middle" class="label">Unix socket · 줄 단위 명령 요청 ↔ JSON 응답</text>
+
+  <rect x="50" y="435" width="1460" height="475" rx="16" fill="#eef2f7" stroke="#aab6c8" stroke-width="2"/>
+  <text x="80" y="476" class="heading">CPU · gpu-host 프로세스</text>
+  <text x="480" y="475" class="muted">하나의 scheduler thread가 상태와 CUDA backend를 소유한다.</text>
+
+  <rect x="75" y="495" width="825" height="385" rx="12" class="frame"/>
+  <text x="100" y="533" class="heading">Broker · 정책과 수명 관리</text>
+
+  <rect x="100" y="552" width="345" height="112" rx="9" class="step"/>
+  <text x="122" y="585" class="label">① 인증 · quota 확인</text>
+  <text x="122" y="618">tenant → session → job</text>
+  <text x="122" y="647" class="small muted">idle 접속은 lane을 점유하지 않는다.</text>
+
+  <rect x="100" y="699" width="345" height="142" rx="9" class="step"/>
+  <text x="122" y="734" class="label">② tenant FIFO admission</text>
+  <text x="122" y="769">빈 lane이 없으면 대기한다.</text>
+  <text x="122" y="800">빈 lane에 tenant를 배정한다.</text>
+  <text x="122" y="830" class="small muted">live job이 0개면 lane 반환</text>
+
+  <rect x="480" y="552" width="390" height="151" rx="9" class="step"/>
+  <text x="502" y="587" class="label">③ credit + quantum 스케줄링</text>
+  <text x="502" y="622">weight에 따라 credit을 충전한다.</text>
+  <text x="502" y="655">같은 tenant의 job slice들을 묶는다.</text>
+  <text x="502" y="689" class="small muted">lane당 동시에 제출된 batch는 하나</text>
+
+  <rect x="480" y="743" width="390" height="98" rx="9" class="step"/>
+  <text x="502" y="777" class="label">⑤ 완료 반영 · 상태 응답</text>
+  <text x="502" y="807" class="small">진행 / done / cancelled</text>
+  <text x="502" y="832" class="small">최종 summary 보관</text>
+
+  <path class="request" d="M410 395 V415 H40 V590 H100"/>
+  <path class="request" d="M272 664 V699"/>
+  <path class="request" d="M445 765 H462 V625 H480"/>
+  <path class="result" d="M675 841 V860 H25 V360 H290"/>
+
+  <rect x="930" y="495" width="555" height="385" rx="12" fill="#eff6ff" stroke="#93b4ef" stroke-width="2"/>
+  <text x="955" y="534" class="heading">CUDA backend · CPU 제어부</text>
+  <rect x="955" y="562" width="505" height="138" rx="9" fill="#ffffff" stroke="#c4ccda" stroke-width="1.5"/>
+  <text x="977" y="596" class="label">④ submit(lane, BatchItem[])</text>
+  <text x="977" y="632">pinned 메타데이터: 전체 7 KiB</text>
+  <text x="977" y="666">descriptor H2D → 커널 → 필요 시 summary D2H</text>
+  <rect x="955" y="743" width="505" height="98" rx="9" fill="#ffffff" stroke="#c4ccda" stroke-width="1.5"/>
+  <text x="977" y="777" class="label">poll(lane) · cudaEventQuery</text>
+  <text x="977" y="810">done event 이후 BatchCompletion 반환</text>
+  <path class="request" d="M870 625 H930"/>
+  <path class="result" d="M930 793 H870"/>
+
+  <path class="request" d="M1085 880 V1020"/>
+  <path class="result" d="M1390 1020 V880"/>
+  <rect x="975" y="946" width="220" height="40" rx="7" fill="#f8fafc"/>
+  <text x="1085" y="973" text-anchor="middle" class="small">H2D · 커널 실행</text>
+  <rect x="1280" y="946" width="220" height="40" rx="7" fill="#f8fafc"/>
+  <text x="1390" y="973" text-anchor="middle" class="small">D2H · 완료 event</text>
+
+  <rect x="50" y="1020" width="1460" height="355" rx="16" fill="#f0fdf4" stroke="#96c5a4" stroke-width="2"/>
+  <text x="80" y="1062" class="heading">GPU · CUDA backend의 device 연산</text>
+  <text x="80" y="1096" class="muted">기본 4 lanes 중 2개 예시 · Green 모드의 각 lane은 별도 SM 실행범위를 사용한다.</text>
+
+  <rect x="85" y="1120" width="665" height="201" rx="12" fill="#ffffff" stroke="#96c5a4" stroke-width="2"/>
+  <text x="110" y="1158" class="label">lane 0 · tenant A의 작업</text>
+  <text x="110" y="1191">Green Context + stream · 16 slots</text>
+  <rect x="110" y="1208" width="100" height="41" rx="5" fill="#e7f5ec" stroke="#96c5a4"/>
+  <rect x="222" y="1208" width="100" height="41" rx="5" fill="#e7f5ec" stroke="#96c5a4"/>
+  <rect x="410" y="1208" width="100" height="41" rx="5" fill="#e7f5ec" stroke="#96c5a4"/>
+  <text x="160" y="1236" text-anchor="middle" class="small">slot 0</text>
+  <text x="272" y="1236" text-anchor="middle" class="small">slot 1</text>
+  <text x="366" y="1236" text-anchor="middle">…</text>
+  <text x="460" y="1236" text-anchor="middle" class="small">slot 15</text>
+  <text x="538" y="1236" class="small">고정 1 MiB / slot</text>
+  <text x="110" y="1295">job slice 묶음 → 1 batch → affine 커널</text>
+
+  <rect x="810" y="1120" width="665" height="201" rx="12" fill="#ffffff" stroke="#96c5a4" stroke-width="2"/>
+  <text x="835" y="1158" class="label">lane 1 · tenant B의 작업</text>
+  <text x="835" y="1191">Green Context + stream · 16 slots</text>
+  <rect x="835" y="1208" width="100" height="41" rx="5" fill="#e7f5ec" stroke="#96c5a4"/>
+  <rect x="947" y="1208" width="100" height="41" rx="5" fill="#e7f5ec" stroke="#96c5a4"/>
+  <rect x="1135" y="1208" width="100" height="41" rx="5" fill="#e7f5ec" stroke="#96c5a4"/>
+  <text x="885" y="1236" text-anchor="middle" class="small">slot 0</text>
+  <text x="997" y="1236" text-anchor="middle" class="small">slot 1</text>
+  <text x="1091" y="1236" text-anchor="middle">…</text>
+  <text x="1185" y="1236" text-anchor="middle" class="small">slot 15</text>
+  <text x="1263" y="1236" class="small">고정 1 MiB / slot</text>
+  <text x="835" y="1295">job slice 묶음 → 1 batch → affine 커널</text>
+
+  <text x="780" y="1355" text-anchor="middle" class="label">GPU arena: 전체 64 MiB · lane당 16 MiB · 최종 slice만 수치 summary 회신</text>
+  <text x="50" y="1423">lane은 실행·소유권 단위다. CUDA thread나 batch 자체를 뜻하지 않는다.</text>
+  <text x="50" y="1462" class="muted">Green Context는 SM 실행범위를 나눈다. MIG · VRAM 보안 격리 · 외부 GPU 프로세스의 차단을 뜻하지 않는다.</text>
+</svg>
