@@ -20,6 +20,7 @@ cuda는 NVIDIA에서 만든 GPU를 운용하는 라이브러리를 말하며 cud
 3. MoE 최적화(활성함수 여러개로 이뤄진 FFN 여러개 입구가 존재하는데 얘들 중에 Router이 직접 TopKIndices를 k개 선택해서 선택된 FFN에만 가중치가 전달된다. 최근엔 FFN하나가 하나의 Expert 역할을 하는게 아니라 Fine-Grained expert, Shared expert 구조가 엄청 연구되고 있고 MoE의 균형 조절 장치, Top-1와 Top-2구조에서의 안정성 관리가 중요하다)
 4. GPUinitiatedcommunication(계산이 끝나고 통신을 준비하면 오버헤드 존재하니 cpu는 미리 gpu한테 요청받아서 RDMA. cpu관련 회사들 주식이 주목받는 이유가 이쪽때문임!!)
 5. GPU 여러대의 분산시스템에서의 통신(Topology Aware)
+6. 메모리 어쩌고(https://youtu.be/9Qf_QLt7IWY 이 영상 보셈)
 
 # 아키텍쳐설명
 <!-- SPDX-License-Identifier: Unlicense -->
